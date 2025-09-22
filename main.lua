@@ -1,186 +1,217 @@
---// Mini Dark UI Library (ähnlich Orion UI)
---// by ChatGPT (free use)
+-- Angepasstes Orion-Skript, Tabs hellblau, nur ein Tab mit Toggle ohne Effekt
 
-local UILib = {}
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local HttpService = game:GetService("HttpService")
 
--- CreateWindow
-function UILib:CreateWindow(title)
-    local ScreenGui = Instance.new("ScreenGui")
-    local MainFrame = Instance.new("Frame")
-    local UICorner = Instance.new("UICorner")
-    local Title = Instance.new("TextLabel")
+local OrionLib = {
+    Elements = {},
+    ThemeObjects = {},
+    Connections = {},
+    Flags = {},
+    Themes = {
+        Default = {
+            Main     = Color3.fromRGB(25, 25, 25),
+            Second   = Color3.fromRGB(32, 32, 32),
+            Stroke   = Color3.fromRGB(60, 60, 60),
+            Divider  = Color3.fromRGB(60, 60, 60),
+            Text     = Color3.fromRGB(240, 240, 240),
+            TextDark = Color3.fromRGB(150, 150, 150),
+            -- Hier neu: Tab Hintergrund hellblau
+            TabBackground = Color3.fromRGB(173, 216, 230) -- hellblau
+        }
+    },
+    SelectedTheme = "Default",
+    Folder = nil,
+    SaveCfg = false
+}
 
-    ScreenGui.Parent = game.CoreGui
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- Hilfsfunktionen etc bleiben wie im Original
 
-    MainFrame.Parent = ScreenGui
-    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    MainFrame.Position = UDim2.new(0.25, 0, 0.2, 0)
-    MainFrame.Size = UDim2.new(0, 500, 0, 320)
+-- ... (der Großteil deines Originalcodes hier, unverändert) ...
 
-    UICorner.CornerRadius = UDim.new(0, 10)
-    UICorner.Parent = MainFrame
+-- Wichtig: in MakeWindow und MakeTab die Farbwerte des Tabs anpassen
+function OrionLib:MakeWindow(WindowConfig)
+    -- ... Vorarbeiten etc ...
 
-    Title.Parent = MainFrame
-    Title.BackgroundTransparency = 1
-    Title.Position = UDim2.new(0, 10, 0, 5)
-    Title.Size = UDim2.new(1, -20, 0, 30)
-    Title.Font = Enum.Font.GothamBold
-    Title.Text = title or "Dark Window"
-    Title.TextColor3 = Color3.fromRGB(200, 200, 200)
-    Title.TextSize = 20
-    Title.TextXAlignment = Enum.TextXAlignment.Left
+    -- TabHolder erzeugen wie gehabt
+    local TabHolder = AddThemeObject(
+        SetChildren(
+            SetProps(MakeElement("ScrollFrame", OrionLib.Themes[OrionLib.SelectedTheme].TabBackground, 4), { -- hier hellblau statt weiß
+                Size = UDim2.new(1, 0, 1, -50)
+            }),
+            { MakeElement("List"), MakeElement("Padding", 8, 0, 0, 8) }
+        ),
+        "Divider"
+    )
+    AddConnection(TabHolder.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
+        TabHolder.CanvasSize = UDim2.new(0, 0, 0, TabHolder.UIListLayout.AbsoluteContentSize.Y + 16)
+    end)
 
-    -- Tab Menu
-    local TabFrame = Instance.new("Frame")
-    TabFrame.Parent = MainFrame
-    TabFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    TabFrame.Size = UDim2.new(0, 120, 1, -40)
-    TabFrame.Position = UDim2.new(0, 0, 0, 40)
+    -- Rest vom Fenster
+    -- ...
 
-    local TabList = Instance.new("UIListLayout")
-    TabList.Parent = TabFrame
-    TabList.Padding = UDim.new(0, 5)
-    TabList.SortOrder = Enum.SortOrder.LayoutOrder
+    -- Nur ein Tab erzeugen:
+    local TabFunction = {}
+    function TabFunction:MakeTab(TabConfig)
+        TabConfig = TabConfig or {}
+        TabConfig.Name = TabConfig.Name or "Einziger Tab"
+        TabConfig.Icon = TabConfig.Icon or ""
+        TabConfig.PremiumOnly = TabConfig.PremiumOnly or false
 
-    -- Container für Tabs
-    local TabContainer = Instance.new("Frame")
-    TabContainer.Parent = MainFrame
-    TabContainer.BackgroundTransparency = 1
-    TabContainer.Size = UDim2.new(1, -130, 1, -40)
-    TabContainer.Position = UDim2.new(0, 130, 0, 40)
+        local TabFrame = SetChildren(
+            SetProps(MakeElement("Button"), {
+                Size = UDim2.new(1, 0, 0, 30),
+                Parent = TabHolder,
+                BackgroundColor3 = OrionLib.Themes[OrionLib.SelectedTheme].TabBackground
+            }),
+            {
+                AddThemeObject(SetProps(MakeElement("Image", TabConfig.Icon), {
+                    AnchorPoint = Vector2.new(0, 0.5),
+                    Size = UDim2.new(0, 18, 0, 18),
+                    Position = UDim2.new(0, 10, 0.5, 0),
+                    ImageTransparency = 0.4,
+                    Name = "Ico"
+                }), "Text"),
 
-    local Tabs = {}
-    local Window = {}
+                AddThemeObject(SetProps(MakeElement("Label", TabConfig.Name, 14), {
+                    Size = UDim2.new(1, -35, 1, 0),
+                    Position = UDim2.new(0, 35, 0, 0),
+                    Font = Enum.Font.GothamSemibold,
+                    TextTransparency = 0.4,
+                    Name = "Title"
+                }), "Text")
+            }
+        )
 
-    function Window:CreateTab(name)
-        local TabButton = Instance.new("TextButton")
-        TabButton.Parent = TabFrame
-        TabButton.Size = UDim2.new(1, -10, 0, 35)
-        TabButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-        TabButton.Font = Enum.Font.Gotham
-        TabButton.Text = name
-        TabButton.TextColor3 = Color3.fromRGB(200, 200, 200)
-        TabButton.TextSize = 16
+        if FirstTab then
+            FirstTab = false
+            TabFrame.Ico.ImageTransparency = 0
+            TabFrame.Title.TextTransparency = 0
+            TabFrame.Title.Font = Enum.Font.GothamBlack
+            Container.Visible = true
+        end
 
-        local TabPage = Instance.new("ScrollingFrame")
-        TabPage.Parent = TabContainer
-        TabPage.Size = UDim2.new(1, 0, 1, 0)
-        TabPage.Visible = false
-        TabPage.BackgroundTransparency = 1
-        TabPage.CanvasSize = UDim2.new(0, 0, 0, 0)
-        TabPage.ScrollBarThickness = 6
-
-        local UIList = Instance.new("UIListLayout")
-        UIList.Parent = TabPage
-        UIList.Padding = UDim.new(0, 6)
-        UIList.SortOrder = Enum.SortOrder.LayoutOrder
-
-        -- Wechsel zwischen Tabs
-        TabButton.MouseButton1Click:Connect(function()
-            for _, t in pairs(Tabs) do
-                t.Page.Visible = false
-            end
-            TabPage.Visible = true
+        AddConnection(TabFrame.MouseButton1Click, function()
+            -- da es nur einen Tab gibt, kein Umschalten nötig
+            -- ggf. hier später Funktion einbauen
         end)
 
-        local TabObj = {}
+        -- Container für den Tab Content
+        local Container = AddThemeObject(
+            SetChildren(
+                SetProps(MakeElement("ScrollFrame", OrionLib.Themes[OrionLib.SelectedTheme].TabBackground, 5), {
+                    Size = UDim2.new(1, -150, 1, -50),
+                    Position = UDim2.new(0, 150, 0, 50),
+                    Parent = MainWindow,
+                    Visible = true, -- sichtbar, da nur Tab
+                    Name = "ItemContainer"
+                }),
+                { MakeElement("List", 0, 6), MakeElement("Padding", 15, 10, 10, 15) }
+            ),
+            "Divider"
+        )
+        AddConnection(Container.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
+            Container.CanvasSize = UDim2.new(0, 0, 0, Container.UIListLayout.AbsoluteContentSize.Y + 30)
+        end)
 
-        -- Button
-        function TabObj:Button(text, callback)
-            local Btn = Instance.new("TextButton")
-            Btn.Parent = TabPage
-            Btn.Size = UDim2.new(1, -10, 0, 35)
-            Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-            Btn.Font = Enum.Font.Gotham
-            Btn.Text = text or "Button"
-            Btn.TextColor3 = Color3.fromRGB(220, 220, 220)
-            Btn.TextSize = 16
-            Btn.MouseButton1Click:Connect(function()
-                if callback then pcall(callback) end
+        -- Toggle im Tab hinzufügen, ohne Wirkung
+        local elements = {}
+        function elements:AddToggle(ToggleConfig)
+            ToggleConfig = ToggleConfig or {}
+            ToggleConfig.Name = ToggleConfig.Name or "Toggle"
+            ToggleConfig.Default = ToggleConfig.Default or false
+            ToggleConfig.Callback = ToggleConfig.Callback or function() end -- keine Wirkung
+            ToggleConfig.Color = ToggleConfig.Color or Color3.fromRGB(9, 99, 195)
+            ToggleConfig.Flag = ToggleConfig.Flag or nil
+            ToggleConfig.Save = ToggleConfig.Save or false
+
+            local Toggle = {Value = ToggleConfig.Default, Save = ToggleConfig.Save}
+            local Click = SetProps(MakeElement("Button"), {
+                Size = UDim2.new(1, 0, 1, 0)
+            })
+            -- ToggleBox etc wie im Original...
+            local ToggleBox = SetChildren(
+                SetProps(MakeElement("RoundFrame", ToggleConfig.Color, 0, 4), {
+                    Size = UDim2.new(0, 24, 0, 24),
+                    Position = UDim2.new(1, -24, 0.5, 0),
+                    AnchorPoint = Vector2.new(0.5, 0.5)
+                }),
+                {
+                    SetProps(MakeElement("Stroke"), { Color = ToggleConfig.Color, Name = "Stroke", Transparency = 0.5 }),
+                    SetProps(MakeElement("Image", "rbxassetid://3944680095"), {
+                        Size = UDim2.new(0, 20, 0, 20),
+                        AnchorPoint = Vector2.new(0.5, 0.5),
+                        Position = UDim2.new(0.5, 0, 0.5, 0),
+                        ImageColor3 = Color3.fromRGB(255, 255, 255),
+                        Name = "Ico"
+                    })
+                }
+            )
+
+            local ToggleFrame = AddThemeObject(
+                SetChildren(
+                    SetProps(MakeElement("RoundFrame", OrionLib.Themes[OrionLib.SelectedTheme].TabBackground, 0, 5), {
+                        Size = UDim2.new(1, 0, 0, 38),
+                        Parent = Container
+                    }),
+                    {
+                        AddThemeObject(SetProps(MakeElement("Label", ToggleConfig.Name, 15), {
+                            Size = UDim2.new(1, -12, 1, 0),
+                            Position = UDim2.new(0, 12, 0, 0),
+                            Font = Enum.Font.GothamBold,
+                            Name = "Content"
+                        }), "Text"),
+
+                        AddThemeObject(SetProps(MakeElement("Stroke"), "Stroke"), "Stroke"),
+
+                        ToggleBox,
+                        Click
+                    }
+                ),
+                "Second"
+            )
+
+            -- Toggle Verhalten: nur visuelles Umschalten
+            function Toggle:Set(Value)
+                Toggle.Value = Value
+                TweenService:Create(ToggleBox, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                    BackgroundColor3 = Toggle.Value and ToggleConfig.Color or OrionLib.Themes.Default.Divider
+                }):Play()
+                TweenService:Create(ToggleBox.Stroke, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                    Color = Toggle.Value and ToggleConfig.Color or OrionLib.Themes.Default.Stroke
+                }):Play()
+                TweenService:Create(ToggleBox.Ico, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                    ImageTransparency = Toggle.Value and 0 or 1,
+                    Size = Toggle.Value and UDim2.new(0, 20, 0, 20) or UDim2.new(0, 8, 0, 8)
+                }):Play()
+                ToggleConfig.Callback(Toggle.Value) -- hier aktuell leer
+            end
+
+            Toggle:Set(Toggle.Value)
+
+            AddConnection(Click.MouseButton1Up, function()
+                Toggle:Set(not Toggle.Value)
             end)
+
+            return Toggle
         end
 
-        -- Toggle
-        function TabObj:Toggle(text, default, callback)
-            local ToggleBtn = Instance.new("TextButton")
-            ToggleBtn.Parent = TabPage
-            ToggleBtn.Size = UDim2.new(1, -10, 0, 35)
-            ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-            ToggleBtn.Font = Enum.Font.Gotham
-            ToggleBtn.Text = text .. " : " .. tostring(default and "ON" or "OFF")
-            ToggleBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
-            ToggleBtn.TextSize = 16
+        -- Toggle hinzufügen
+        elements:AddToggle({ Name = "Mein Toggle", Default = false })
 
-            local state = default or false
-            ToggleBtn.MouseButton1Click:Connect(function()
-                state = not state
-                ToggleBtn.Text = text .. " : " .. (state and "ON" or "OFF")
-                if callback then pcall(callback, state) end
-            end)
-        end
-
-        -- Slider
-        function TabObj:Slider(text, min, max, default, callback)
-            local Frame = Instance.new("Frame")
-            Frame.Parent = TabPage
-            Frame.Size = UDim2.new(1, -10, 0, 50)
-            Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-
-            local Label = Instance.new("TextLabel")
-            Label.Parent = Frame
-            Label.Size = UDim2.new(1, 0, 0, 20)
-            Label.BackgroundTransparency = 1
-            Label.Font = Enum.Font.Gotham
-            Label.Text = text .. ": " .. tostring(default)
-            Label.TextColor3 = Color3.fromRGB(220, 220, 220)
-            Label.TextSize = 14
-
-            local SliderBack = Instance.new("Frame")
-            SliderBack.Parent = Frame
-            SliderBack.Size = UDim2.new(1, -20, 0, 10)
-            SliderBack.Position = UDim2.new(0, 10, 0, 30)
-            SliderBack.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-
-            local Fill = Instance.new("Frame")
-            Fill.Parent = SliderBack
-            Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-            Fill.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
-
-            local UIS = game:GetService("UserInputService")
-            local held = false
-
-            SliderBack.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    held = true
-                end
-            end)
-            SliderBack.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    held = false
-                end
-            end)
-
-            UIS.InputChanged:Connect(function(input)
-                if held and input.UserInputType == Enum.UserInputType.MouseMovement then
-                    local percent = math.clamp((input.Position.X - SliderBack.AbsolutePosition.X) / SliderBack.AbsoluteSize.X, 0, 1)
-                    local value = math.floor(min + (max - min) * percent)
-                    Fill.Size = UDim2.new(percent, 0, 1, 0)
-                    Label.Text = text .. ": " .. tostring(value)
-                    if callback then pcall(callback, value) end
-                end
-            end)
-        end
-
-        Tabs[name] = { Page = TabPage, Btn = TabButton }
-        if #TabFrame:GetChildren() == 2 then -- erster Tab auto aktiv
-            TabPage.Visible = true
-        end
-
-        return TabObj
+        return elements
     end
 
-    return Window
+    -- Fenster erzeugen etc...
+    -- Hier aufrufen:
+    local win = OrionLib:MakeWindow({ Name = "Meine Kopie", SaveConfig = false })
+    win:MakeTab({ Name = "Tab1" })
+
+    return OrionLib
 end
 
-return UILib
+return OrionLib
